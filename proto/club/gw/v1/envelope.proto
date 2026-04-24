@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package club.gw.v1;
+
+// Envelope 是 Godot ↔ Gateway 之間所有 WS binary frame 的外層封包。
+//
+// cmd_id 分配規則、service 值與 payload 對應的內層 message
+// 皆定義於 docs/protocol.md。
+message Envelope {
+  uint32 cmd_id = 1;
+  string service = 2;     // "game-ddz" / "tx" / "lobby" / ...
+  string trace_id = 3;
+  bytes payload = 4;      // 序列化後的內層 message
+  uint32 seq = 5;         // 客戶端序號（用於請求-回應配對，0 代表無）
+}
+
+// ---- 系統指令的內層 message（cmd_id 範圍 0x0001xxxx） ----
+
+message HelloRequest {
+  string token = 1;
+  string client_version = 2;
+  string device_id = 3;
+}
+
+message HelloResponse {
+  bool ok = 1;
+  string user_id = 2;
+  string server_time = 3;  // RFC3339
+  string gateway_id = 4;
+}
+
+message Ping {
+  int64 ts = 1;
+}
+
+message Pong {
+  int64 client_ts = 1;
+  int64 server_ts = 2;
+}
+
+enum KickReason {
+  KICK_REASON_UNSPECIFIED = 0;
+  KICK_REASON_TOKEN_EXPIRED = 1;
+  KICK_REASON_DUPLICATE_LOGIN = 2;
+  KICK_REASON_BANNED = 3;
+  KICK_REASON_SERVER_SHUTDOWN = 4;
+}
+
+message Kick {
+  KickReason reason = 1;
+  string message = 2;
+}

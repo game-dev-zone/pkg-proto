@@ -1,0 +1,145 @@
+syntax = "proto3";
+
+package club.game.v1;
+
+import "club/common/v1/common.proto";
+
+// ---------------------------------------------------------------------------
+// GameState
+// ---------------------------------------------------------------------------
+
+enum GameState {
+  GAME_STATE_UNSPECIFIED = 0;
+  GAME_STATE_WAITING = 1;
+  GAME_STATE_PLAYING = 2;
+  GAME_STATE_SETTLING = 3;
+  GAME_STATE_CLOSED = 4;
+}
+
+// ---------------------------------------------------------------------------
+// Entities
+// ---------------------------------------------------------------------------
+
+message Seat {
+  int32 index = 1;
+  string user_id = 2;
+  int64 stake = 3;     // 該座位目前押注
+  bool is_owner = 4;   // 是否為房主（莊家）
+}
+
+message RoomSnapshot {
+  string room_id = 1;
+  string owner_id = 2;
+  string game_id = 3;
+  repeated Seat seats = 4;
+  GameState state = 5;
+  int64 ante = 6;      // 底注
+  int32 max_seats = 7;
+  int64 created_at = 8;
+}
+
+message Payout {
+  string user_id = 1;
+  int64 delta = 2;     // 正數=贏、負數=輸
+  string reason = 3;
+}
+
+message ChatMessage {
+  string from = 1;
+  string text = 2;
+  int64 ts = 3;
+}
+
+// ---------------------------------------------------------------------------
+// Request / Response
+// ---------------------------------------------------------------------------
+
+message CreateRoomRequest {
+  string user_id = 1;
+  string game_id = 2;
+  int64 ante = 3;
+  int32 max_seats = 4;
+  int64 owner_stake = 5;  // 莊家押金
+}
+
+message CreateRoomResponse {
+  club.common.v1.Ack ack = 1;
+  string room_id = 2;
+}
+
+message EnterRoomRequest {
+  string user_id = 1;
+  string room_id = 2;
+  string game_id = 3;
+}
+
+message EnterRoomResponse {
+  club.common.v1.Ack ack = 1;
+  RoomSnapshot snapshot = 2;
+}
+
+message LeaveRoomRequest {
+  string user_id = 1;
+  string room_id = 2;
+}
+
+message LeaveRoomResponse {
+  club.common.v1.Ack ack = 1;
+}
+
+message PlaceBetRequest {
+  string user_id = 1;
+  string room_id = 2;
+  int64 amount = 3;
+  bytes extra = 4;       // 各遊戲自訂（牌選擇、倍率等）
+}
+
+message PlaceBetResponse {
+  club.common.v1.Ack ack = 1;
+  int64 new_balance = 2;
+}
+
+message SettleRequest {
+  string room_id = 1;
+}
+
+message SettleResponse {
+  club.common.v1.Ack ack = 1;
+  repeated Payout payouts = 2;
+}
+
+// ---------------------------------------------------------------------------
+// Broadcast (server-stream)
+// ---------------------------------------------------------------------------
+
+message SubscribeRequest {
+  string user_id = 1;
+  string room_id = 2;
+}
+
+message SubscribeResponse {
+  string room_id = 1;
+  int64 ts = 2;
+  oneof payload {
+    RoomSnapshot snapshot = 10;
+    Payout payout = 11;
+    ChatMessage chat = 12;
+    GameState state_changed = 13;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Service
+// ---------------------------------------------------------------------------
+
+service GameService {
+  rpc CreateRoom(CreateRoomRequest) returns (CreateRoomResponse);
+  rpc EnterRoom(EnterRoomRequest) returns (EnterRoomResponse);
+  rpc LeaveRoom(LeaveRoomRequest) returns (LeaveRoomResponse);
+  rpc PlaceBet(PlaceBetRequest) returns (PlaceBetResponse);
+  rpc Settle(SettleRequest) returns (SettleResponse);
+
+  // 訂閱房間廣播（server-streaming）。進房後由 gateway 代理開 stream，
+  // 把 SubscribeResponse 推送給該房內所有 WS 客戶端。
+  rpc Subscribe(SubscribeRequest) returns (stream SubscribeResponse);
+}

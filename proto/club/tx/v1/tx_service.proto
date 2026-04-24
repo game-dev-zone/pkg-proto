@@ -1,0 +1,86 @@
+syntax = "proto3";
+
+package club.tx.v1;
+
+import "club/common/v1/common.proto";
+
+// TxType 對應一筆流水的類型。
+enum TxType {
+  TX_TYPE_UNSPECIFIED = 0;
+  TX_TYPE_ROOM_FEE = 1;      // 開房扣費
+  TX_TYPE_BET = 2;           // 下注
+  TX_TYPE_SETTLE_WIN = 3;    // 結算獲勝
+  TX_TYPE_SETTLE_LOSS = 4;   // 結算輸
+  TX_TYPE_FREEZE = 5;        // 凍結（押金）
+  TX_TYPE_UNFREEZE = 6;      // 解凍
+  TX_TYPE_DEPOSIT = 7;       // 儲值
+  TX_TYPE_WITHDRAW = 8;      // 提現
+  TX_TYPE_REFUND = 9;        // 退款
+}
+
+// TxEntry 一筆流水。amount 的正負號代表資金進出（相對於 user 錢包）。
+message TxEntry {
+  string tx_id = 1;          // UUID，冪等子 key（與 idempotency_key 組合唯一）
+  string user_id = 2;
+  TxType type = 3;
+  int64 amount = 4;
+  string ref_room_id = 5;
+  string ref_game_id = 6;
+  int64 created_at = 7;
+  string trace_id = 8;
+  string memo = 9;           // 備註
+}
+
+// ---------------------------------------------------------------------------
+// Transfer：原子多筆異動（核心接口）
+// ---------------------------------------------------------------------------
+
+message TransferRequest {
+  // idempotency_key 必填。tx 表 UNIQUE；相同 key 重送回傳原結果。
+  string idempotency_key = 1;
+  // 一次事務內的多筆流水，全部在同一個 Postgres Tx 中寫入。
+  repeated TxEntry entries = 2;
+}
+
+message TransferResponse {
+  club.common.v1.Ack ack = 1;
+  // 異動後受影響錢包的最新狀態。
+  repeated club.common.v1.Wallet wallets = 2;
+}
+
+// ---------------------------------------------------------------------------
+// 查詢
+// ---------------------------------------------------------------------------
+
+message GetBalanceRequest {
+  string user_id = 1;
+}
+
+message GetBalanceResponse {
+  club.common.v1.Ack ack = 1;
+  club.common.v1.Wallet wallet = 2;
+}
+
+message QueryRecordsRequest {
+  string user_id = 1;
+  int64 since = 2;          // unix seconds
+  int64 until = 3;
+  int32 limit = 4;
+  string cursor = 5;        // 分頁游標
+}
+
+message QueryRecordsResponse {
+  club.common.v1.Ack ack = 1;
+  repeated TxEntry entries = 2;
+  string next_cursor = 3;
+}
+
+// ---------------------------------------------------------------------------
+// Service
+// ---------------------------------------------------------------------------
+
+service TxService {
+  rpc Transfer(TransferRequest) returns (TransferResponse);
+  rpc GetBalance(GetBalanceRequest) returns (GetBalanceResponse);
+  rpc QueryRecords(QueryRecordsRequest) returns (QueryRecordsResponse);
+}

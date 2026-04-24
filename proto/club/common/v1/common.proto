@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package club.common.v1;
+
+// UserInfo 代表一位玩家的公開資料。
+message UserInfo {
+  string user_id = 1;
+  string nickname = 2;
+  string avatar_url = 3;
+  int32 vip_level = 4;
+  int64 created_at = 5; // unix seconds
+}
+
+// Wallet 代表玩家錢包狀態。金額一律以最小單位（分）儲存，避免浮點誤差。
+message Wallet {
+  string user_id = 1;
+  int64 balance = 2;     // 可用餘額
+  int64 frozen = 3;      // 鎖定中金額（開房押金等）
+  string currency = 4;   // "CNY" / "USD" 等
+  int64 updated_at = 5;
+}
+
+// ErrorCode 為全站錯誤碼。範圍分配見 docs/protocol.md。
+// 零值為 UNSPECIFIED 以符合 proto3 慣例；成功請使用 ERROR_CODE_OK。
+enum ErrorCode {
+  ERROR_CODE_UNSPECIFIED = 0;
+  ERROR_CODE_OK = 1;
+
+  // 1000-1999: 鑑權 / 會話
+  ERROR_CODE_UNAUTHENTICATED = 1001;
+  ERROR_CODE_TOKEN_EXPIRED = 1002;
+  ERROR_CODE_PERMISSION_DENIED = 1003;
+
+  // 2000-2999: 金流
+  ERROR_CODE_INSUFFICIENT_BALANCE = 2001;
+  ERROR_CODE_RISK_BLOCKED = 2002;
+
+  // 3000-3999: 房間 / 座位
+  ERROR_CODE_ROOM_FULL = 3001;
+  ERROR_CODE_ROOM_NOT_FOUND = 3002;
+  ERROR_CODE_NOT_ROOM_OWNER = 3003;
+  ERROR_CODE_ALREADY_IN_ROOM = 3004;
+
+  // 4000-4999: 交易 / 併發
+  ERROR_CODE_TX_CONFLICT = 4001;
+  ERROR_CODE_IDEMPOTENCY_CONFLICT = 4002;
+
+  // 5000-5999: 業務
+  ERROR_CODE_INVALID_BET = 5001;
+  ERROR_CODE_GAME_STATE_INVALID = 5002;
+
+  // 9000-9999: 系統
+  ERROR_CODE_INTERNAL = 9999;
+}
+
+// Ack 為所有 RPC response 的共用首欄位。
+message Ack {
+  ErrorCode code = 1;
+  string message = 2;
+  string trace_id = 3;
+}
