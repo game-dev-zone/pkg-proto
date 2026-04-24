@@ -1,1 +1,4 @@
-gen/
+# pkg-proto 的 gen/ 是對外公開 module 的必要檔（外部 go get 消費），必須進版控。
+# 其他子專案的 gen/ 由根 .gitignore 的 **/gen/ 規則處理（只有 pkg-proto 需要保留）。
+#
+# 本目錄不 ignore 任何東西；此檔存在只是為了文件化這個決定。
