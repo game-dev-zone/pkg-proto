@@ -25,14 +25,14 @@ go build ./...                    # 驗證產物
 ## Go Module
 
 ```
-module github.com/club8/pkg-proto
+module github.com/game-dev-zone/pkg-proto
 ```
 
 其他服務 import 範例：
 
 ```go
 import (
-    commonv1 "github.com/club8/pkg-proto/gen/go/common/v1"
-    gamev1   "github.com/club8/pkg-proto/gen/go/game/v1"
+    commonv1 "github.com/game-dev-zone/pkg-proto/gen/go/common/v1"
+    gamev1   "github.com/game-dev-zone/pkg-proto/gen/go/game/v1"
 )
 ```

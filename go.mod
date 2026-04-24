@@ -1,4 +1,4 @@
-module github.com/club8/pkg-proto
+module github.com/game-dev-zone/pkg-proto
 
 go 1.22
 

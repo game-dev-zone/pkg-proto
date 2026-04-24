@@ -1,6 +1,6 @@
 # pkg-proto Changelog
 
-本檔以 [Keep a Changelog](https://keepachangelog.com/) 格式記錄 `github.com/club8/pkg-proto` 的公開契約變更。
+本檔以 [Keep a Changelog](https://keepachangelog.com/) 格式記錄 `github.com/game-dev-zone/pkg-proto` 的公開契約變更。
 
 版本策略：
 - 以 semver 發佈 git tag（例：`v1.0.0`）。
@@ -12,7 +12,7 @@
 
 ### Added
 - `club.record.v1`：新增 Record 域。`RecordService.WriteGameRecord` 冪等寫入一場對局審計紀錄；`RecordService.QueryGameRecords` 支援 user/game/room 過濾與 cursor 分頁。配套的 Go service 位於 `club+server/record/`。
-- `pkg-game-framework` 模組（`github.com/club8/pkg-game-framework`）以此 proto 為依賴，於 Settle 成功後背景寫入紀錄。
+- `pkg-game-framework` 模組（`github.com/game-dev-zone/pkg-game-framework`）以此 proto 為依賴，於 Settle 成功後背景寫入紀錄。
 
 ### Changed
 - **Idempotency key 前綴規則（framework 層）**：由 `pkg-game-framework` 產生的 key 一律帶 `<game_id>-` 前綴（例：`ddz-bet-<room_id>-<user_id>-<amount>`、`ddz-settle-<room_id>`）。此規則不影響 proto，但消費者若手寫 idempotency key，建議對齊。`game-ddz` 於此次遷移前的 `tx_entries` 舊紀錄屬於無前綴的舊命名空間，**不回填**。
@@ -26,4 +26,4 @@
 - `club.gw.v1`：`Envelope` / `HelloRequest` / `HelloResponse` / `Ping` / `Pong` / `Kick` / `KickReason`
 - `club.record.v1`：`RecordService`（WriteGameRecord / QueryGameRecords）、`GameRecord`
 
-Tag 切法：從 monorepo `main` 鏡像推送到獨立 repo `github.com/club8/pkg-proto` 後打 tag；外部消費者 `go get github.com/club8/pkg-proto@v1.0.0` 即可。
+Tag 切法：從 monorepo `main` 鏡像推送到獨立 repo `github.com/game-dev-zone/pkg-proto` 後打 tag；外部消費者 `go get github.com/game-dev-zone/pkg-proto@v1.0.0` 即可。
