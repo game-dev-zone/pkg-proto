@@ -43,8 +43,12 @@ type GameRecord struct {
 	GameDetail     []byte                 `protobuf:"bytes,9,opt,name=game_detail,json=gameDetail,proto3" json:"game_detail,omitempty"`              // 各遊戲自訂 snapshot (牌型/賠率表/命中線 …)
 	IdempotencyKey string                 `protobuf:"bytes,10,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"` // UNIQUE；重送回傳原結果
 	TraceId        string                 `protobuf:"bytes,11,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// 牌局回放 blob（club.replay.v1.ReplayBlob 序列化）；nil = 該遊戲不支援回放
+	ReplayPb []byte `protobuf:"bytes,12,opt,name=replay_pb,json=replayPb,proto3" json:"replay_pb,omitempty"`
+	// ReplayBlob 版本；客戶端用此分流到對應 ReplayPlayer 跑老 / 新對局
+	ReplayVersion uint32 `protobuf:"varint,13,opt,name=replay_version,json=replayVersion,proto3" json:"replay_version,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GameRecord) Reset() {
@@ -154,6 +158,20 @@ func (x *GameRecord) GetTraceId() string {
 	return ""
 }
 
+func (x *GameRecord) GetReplayPb() []byte {
+	if x != nil {
+		return x.ReplayPb
+	}
+	return nil
+}
+
+func (x *GameRecord) GetReplayVersion() uint32 {
+	if x != nil {
+		return x.ReplayVersion
+	}
+	return 0
+}
+
 type WriteGameRecordRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Record        *GameRecord            `protobuf:"bytes,1,opt,name=record,proto3" json:"record,omitempty"`
@@ -252,14 +270,17 @@ func (x *WriteGameRecordResponse) GetRecordId() string {
 
 // QueryGameRecordsRequest 支援按 user / game / room 過濾與 cursor 分頁。
 type QueryGameRecordsRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"` // 可選：只回傳 user 在 payouts 中出現的場次
-	GameId        string                 `protobuf:"bytes,2,opt,name=game_id,json=gameId,proto3" json:"game_id,omitempty"` // 可選：按遊戲過濾
-	RoomId        string                 `protobuf:"bytes,3,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"` // 可選：按房間過濾
-	Since         int64                  `protobuf:"varint,4,opt,name=since,proto3" json:"since,omitempty"`                // unix seconds，settled_at 下界（含）
-	Until         int64                  `protobuf:"varint,5,opt,name=until,proto3" json:"until,omitempty"`                // unix seconds，settled_at 上界（不含）
-	Limit         int32                  `protobuf:"varint,6,opt,name=limit,proto3" json:"limit,omitempty"`                // default 50, max 500
-	Cursor        string                 `protobuf:"bytes,7,opt,name=cursor,proto3" json:"cursor,omitempty"`               // 由上一頁 response.next_cursor 帶入
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	UserId string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"` // 可選：只回傳 user 在 payouts 中出現的場次
+	GameId string                 `protobuf:"bytes,2,opt,name=game_id,json=gameId,proto3" json:"game_id,omitempty"` // 可選：按遊戲過濾
+	RoomId string                 `protobuf:"bytes,3,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"` // 可選：按房間過濾
+	Since  int64                  `protobuf:"varint,4,opt,name=since,proto3" json:"since,omitempty"`                // unix seconds，settled_at 下界（含）
+	Until  int64                  `protobuf:"varint,5,opt,name=until,proto3" json:"until,omitempty"`                // unix seconds，settled_at 上界（不含）
+	Limit  int32                  `protobuf:"varint,6,opt,name=limit,proto3" json:"limit,omitempty"`                // default 50, max 500
+	Cursor string                 `protobuf:"bytes,7,opt,name=cursor,proto3" json:"cursor,omitempty"`               // 由上一頁 response.next_cursor 帶入
+	// 可選：按 record_id 過濾（單筆 lookup；user_id 同時設給安全；
+	// 給 client drill-into 牌局回放用）
+	RecordId      string `protobuf:"bytes,8,opt,name=record_id,json=recordId,proto3" json:"record_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -343,6 +364,13 @@ func (x *QueryGameRecordsRequest) GetCursor() string {
 	return ""
 }
 
+func (x *QueryGameRecordsRequest) GetRecordId() string {
+	if x != nil {
+		return x.RecordId
+	}
+	return ""
+}
+
 type QueryGameRecordsResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Ack           *v11.Ack               `protobuf:"bytes,1,opt,name=ack,proto3" json:"ack,omitempty"`
@@ -407,7 +435,7 @@ var File_club_record_v1_record_service_proto protoreflect.FileDescriptor
 
 const file_club_record_v1_record_service_proto_rawDesc = "" +
 	"\n" +
-	"#club/record/v1/record_service.proto\x12\x0eclub.record.v1\x1a\x1bclub/common/v1/common.proto\x1a\x1fclub/game/v1/game_service.proto\"\xe6\x02\n" +
+	"#club/record/v1/record_service.proto\x12\x0eclub.record.v1\x1a\x1bclub/common/v1/common.proto\x1a\x1fclub/game/v1/game_service.proto\"\xaa\x03\n" +
 	"\n" +
 	"GameRecord\x12\x1b\n" +
 	"\trecord_id\x18\x01 \x01(\tR\brecordId\x12\x17\n" +
@@ -424,12 +452,14 @@ const file_club_record_v1_record_service_proto_rawDesc = "" +
 	"gameDetail\x12'\n" +
 	"\x0fidempotency_key\x18\n" +
 	" \x01(\tR\x0eidempotencyKey\x12\x19\n" +
-	"\btrace_id\x18\v \x01(\tR\atraceId\"L\n" +
+	"\btrace_id\x18\v \x01(\tR\atraceId\x12\x1b\n" +
+	"\treplay_pb\x18\f \x01(\fR\breplayPb\x12%\n" +
+	"\x0ereplay_version\x18\r \x01(\rR\rreplayVersion\"L\n" +
 	"\x16WriteGameRecordRequest\x122\n" +
 	"\x06record\x18\x01 \x01(\v2\x1a.club.record.v1.GameRecordR\x06record\"]\n" +
 	"\x17WriteGameRecordResponse\x12%\n" +
 	"\x03ack\x18\x01 \x01(\v2\x13.club.common.v1.AckR\x03ack\x12\x1b\n" +
-	"\trecord_id\x18\x02 \x01(\tR\brecordId\"\xbe\x01\n" +
+	"\trecord_id\x18\x02 \x01(\tR\brecordId\"\xdb\x01\n" +
 	"\x17QueryGameRecordsRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x17\n" +
 	"\agame_id\x18\x02 \x01(\tR\x06gameId\x12\x17\n" +
@@ -437,7 +467,8 @@ const file_club_record_v1_record_service_proto_rawDesc = "" +
 	"\x05since\x18\x04 \x01(\x03R\x05since\x12\x14\n" +
 	"\x05until\x18\x05 \x01(\x03R\x05until\x12\x14\n" +
 	"\x05limit\x18\x06 \x01(\x05R\x05limit\x12\x16\n" +
-	"\x06cursor\x18\a \x01(\tR\x06cursor\"\x98\x01\n" +
+	"\x06cursor\x18\a \x01(\tR\x06cursor\x12\x1b\n" +
+	"\trecord_id\x18\b \x01(\tR\brecordId\"\x98\x01\n" +
 	"\x18QueryGameRecordsResponse\x12%\n" +
 	"\x03ack\x18\x01 \x01(\v2\x13.club.common.v1.AckR\x03ack\x124\n" +
 	"\arecords\x18\x02 \x03(\v2\x1a.club.record.v1.GameRecordR\arecords\x12\x1f\n" +

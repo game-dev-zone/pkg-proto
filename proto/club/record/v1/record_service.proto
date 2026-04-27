@@ -28,6 +28,10 @@ message GameRecord {
   bytes game_detail = 9;       // 各遊戲自訂 snapshot (牌型/賠率表/命中線 …)
   string idempotency_key = 10; // UNIQUE；重送回傳原結果
   string trace_id = 11;
+  // 牌局回放 blob（club.replay.v1.ReplayBlob 序列化）；nil = 該遊戲不支援回放
+  bytes replay_pb = 12;
+  // ReplayBlob 版本；客戶端用此分流到對應 ReplayPlayer 跑老 / 新對局
+  uint32 replay_version = 13;
 }
 
 // ---------------------------------------------------------------------------
@@ -52,6 +56,9 @@ message QueryGameRecordsRequest {
   int64 until = 5;        // unix seconds，settled_at 上界（不含）
   int32 limit = 6;        // default 50, max 500
   string cursor = 7;      // 由上一頁 response.next_cursor 帶入
+  // 可選：按 record_id 過濾（單筆 lookup；user_id 同時設給安全；
+  // 給 client drill-into 牌局回放用）
+  string record_id = 8;
 }
 
 message QueryGameRecordsResponse {

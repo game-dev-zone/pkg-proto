@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package club.replay.v1;
+
+option go_package = "github.com/game-dev-zone/pkg-proto/gen/go/club/replay/v1;replayv1";
+
+// ---------------------------------------------------------------------------
+// 牌局回放（self-developed games：DDZ / niuniu / ...）
+//
+// 設計原則（同 docs/architecture.md replay 段）：
+//   1. ReplayBlob 是「初始狀態 + 操作序列」snapshot；客戶端從零跑一遍 Logic
+//      重演對局，呈現上以「明牌」展示。三方遊戲（fish/slots）不適用。
+//   2. version 用於版本相容；遊戲 Logic 改規則時 bump，並保留歷史 ReplayPlayer
+//      在 PCK 內，新舊對局分流到對應 player 跑。詳見 docs/replay.md（待補）。
+//   3. initial_pb / events.action 各遊戲序列化自己的 oneof / wrapper（不污染
+//      共用 proto）；framework / 平台層只看 envelope，不解 payload。
+//   4. random_seed：Logic 必須是純函數；隨機性（牌序 / 流向）由 seed 注入決定，
+//      重放時用同一個 seed → 相同結果。
+//   5. 不存「結果」— 由 client 重跑算出 payouts，跟 game_records.payouts 比對；
+//      不一致 = 客戶端版本與記錄版本不符 → toast 降級訊息。
+// ---------------------------------------------------------------------------
+
+message ReplayBlob {
+  // 對應 GameRecord.game_id；客戶端用此 dispatch 到對應 game_id 的 replay scene
+  string game_id = 1;
+
+  // 該遊戲 Logic 的版本號；遊戲端改規則時 bump（從 1 開始）
+  uint32 version = 2;
+
+  // 初始狀態的序列化 blob（各遊戲自定）：
+  //   DDZ：洗好的 54 張牌、底牌、第一個叫地主 seat
+  //   niuniu：莊家 seat、押金、五張牌洗序
+  bytes initial_pb = 3;
+
+  // 操作序列；長度 ~30-50（DDZ）
+  repeated ReplayEvent events = 4;
+
+  // 已注入隨機性的 seed；可用於重放時 deterministic shuffle
+  // 設計意圖：initial_pb 已含洗好的牌；seed 是備用（給後續可能有的 mid-round 隨機性）
+  int64 random_seed = 5;
+}
+
+message ReplayEvent {
+  // 對局內相對毫秒（不是 wall clock）；給客戶端做動畫節奏
+  int64 ts_ms = 1;
+  // 0..N-1 座位
+  uint32 seat = 2;
+  // 各遊戲塞自己的 wrapper bytes — 不在共用 proto 列舉所有遊戲的 oneof，避免
+  // 新遊戲上架要回頭改 pkg-proto。客戶端拿到後自己 unmarshal 對應遊戲的 schema。
+  string action_type = 3; // 例："ddz_bid" / "ddz_play" / "niu_bet"
+  bytes  action_pb   = 4;
+}
